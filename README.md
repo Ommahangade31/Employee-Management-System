@@ -1,255 +1,316 @@
 # Employee Management System
+### End-to-End DevOps Pipeline — Undergraduate Mini-Project
 
-A full-stack Employee Management System built with **Python Flask**, **SQLite**, and a complete **DevOps pipeline** using Docker, Jenkins, Prometheus, and Grafana.
-
-This is an undergraduate AI & Data Science mini-project demonstrating end-to-end DevOps practices.
+A full-stack Employee Management System built with **Python Flask** and **SQLite**, demonstrating a complete DevOps pipeline using Docker, Jenkins, Prometheus, and Grafana.
 
 ---
 
 ## Features
 
-- **Dashboard** – Summary cards, department breakdown, recently added employees
-- **Add Employee** – Form with server-side validation
-- **View Employees** – Paginated responsive table
-- **Search & Filter** – Filter by name, ID, or department
-- **Edit Employee** – Update any field with validation
-- **Delete Employee** – Confirmation modal before deletion
-- **Employee Details** – Full record view
-- **Health Check** – `/health` endpoint
-- **Prometheus Metrics** – `/metrics` endpoint
+| Feature | Description |
+|---|---|
+| Dashboard | Summary cards, department chart, recently added employees |
+| Add Employee | Form with server-side validation (unique ID, email, required fields) |
+| View Employees | Responsive sortable table |
+| Search & Filter | Filter by name, employee ID, or department |
+| Edit Employee | Update any field with validation |
+| Delete Employee | Confirmation modal before deletion |
+| Employee Details | Full record view |
+| `/health` | JSON health-check endpoint |
+| `/metrics` | Prometheus-compatible metrics endpoint |
 
 ---
 
 ## Technology Stack
 
-| Layer         | Technology                          |
-|---------------|-------------------------------------|
-| Frontend      | HTML5, CSS3, Bootstrap 5, Jinja2    |
-| Backend       | Python 3.11, Flask 3                |
-| Database      | SQLite (persistent via Docker volume)|
-| Testing       | Pytest, Flask test client           |
-| Containerization | Docker, Docker Compose           |
-| CI/CD         | Jenkins (Declarative Pipeline)      |
-| Registry      | Docker Hub                          |
-| Monitoring    | Prometheus                          |
-| Visualization | Grafana                             |
+| Layer | Technology |
+|---|---|
+| Frontend | HTML5, CSS3, Bootstrap 5, Jinja2 |
+| Backend | Python 3.11, Flask 3.0, Gunicorn |
+| Database | SQLite (Docker named volume for persistence) |
+| Testing | Pytest 8, Flask test client |
+| Version Control | Git, GitHub |
+| CI/CD | Jenkins (Declarative Pipeline) |
+| Containerization | Docker, Docker Compose |
+| Registry | Docker Hub |
+| Monitoring | Prometheus |
+| Visualization | Grafana |
 
 ---
 
 ## Prerequisites
 
-- Python 3.11+
-- pip
-- Docker Desktop (for containerized runs)
-- Git
+| Tool | Purpose | Install |
+|---|---|---|
+| Python 3.11+ | Run the app locally | https://python.org |
+| Git | Version control | https://git-scm.com |
+| Docker Desktop | Containers + Compose | https://docs.docker.com/desktop/ |
+| Jenkins | CI/CD server | https://jenkins.io/download/ |
 
 ---
 
-## Installation – Running Locally
+## Running Locally (No Docker)
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/employee-management-system.git
-cd employee-management-system
-
-# 2. Create a virtual environment
+```powershell
+# 1 — Create virtual environment
 python -m venv venv
+.\venv\Scripts\activate          # Windows PowerShell
+# source venv/bin/activate       # Linux / macOS
 
-# Activate on Windows
-venv\Scripts\activate
-
-# Activate on Linux/macOS
-source venv/bin/activate
-
-# 3. Install dependencies
+# 2 — Install dependencies
 pip install -r requirements.txt
 
-# 4. Initialise the database and add sample data
+# 3 — Initialise the database and load sample data
 python -c "from app import init_db, seed_db; init_db(); seed_db()"
 
-# 5. Run the application
+# 4 — Start the development server
 python app.py
 ```
 
-Open your browser at **http://localhost:5000**
+Open **http://localhost:5000**
+
+To stop: press `Ctrl+C`
 
 ---
 
 ## Running Automated Tests
 
-```bash
-# Activate your virtual environment first (see above)
-
-# Run all tests
+```powershell
+# Activate the virtual environment first (see above), then:
 pytest test_app.py -v
-
-# Run with coverage report
-pytest test_app.py -v --cov=app --cov-report=term-missing
 ```
 
-Tests use a temporary database – your real data is never touched.
+**Verified result (13 tests, 0 failures):**
+```
+test_dashboard_returns_200                  PASSED
+test_employee_listing_returns_200           PASSED
+test_create_employee_success                PASSED
+test_employee_saved_in_database             PASSED
+test_duplicate_employee_id_rejected         PASSED
+test_invalid_email_rejected                 PASSED
+test_missing_required_fields_rejected       PASSED
+test_update_employee                        PASSED
+test_delete_employee                        PASSED
+test_search_employee                        PASSED
+test_nonexistent_employee_returns_404       PASSED
+test_health_check                           PASSED
+test_metrics_endpoint                       PASSED
+======================== 13 passed in 0.73s ==============================
+```
+
+Tests use a temporary database — real data is never modified.
 
 ---
 
-## Docker – Build and Run
-
-### Build the image
+## Docker — Single Container
 
 ```bash
+# Build the image
 docker build -t employee-management-system .
-```
 
-### Run the container
-
-```bash
+# Run the container (database stored in a named volume)
 docker run -d \
-  --name ems_app \
+  --name ems \
   -p 5000:5000 \
-  -v ems_db_data:/app/data \
+  -v ems_db:/app/data \
   -e SECRET_KEY=my-secret-key \
   employee-management-system
-```
 
-Open **http://localhost:5000**
+# Check it is running
+docker ps
 
-### Stop the container
+# View logs
+docker logs -f ems
 
-```bash
-docker stop ems_app && docker rm ems_app
+# Stop and remove
+docker stop ems && docker rm ems
 ```
 
 ---
 
-## Docker Compose – Full Stack (App + Prometheus + Grafana)
+## Docker Compose — Full Stack (App + Prometheus + Grafana)
 
 ```bash
 # Start all services in the background
 docker-compose up -d
 
-# Check running services
+# Check all containers are running (should show 3 containers Up)
 docker-compose ps
 
-# View logs
-docker-compose logs -f
+# Stream logs from the app
+docker-compose logs -f app
 
-# Stop all services
+# Rebuild the app image (after code changes)
+docker-compose up -d --build
+
+# Stop all services (keeps volumes/database intact)
 docker-compose down
+
+# Stop and DELETE all data (volumes)
+docker-compose down -v
 ```
 
-| Service    | URL                    |
-|------------|------------------------|
-| Application| http://localhost:5000  |
-| Prometheus | http://localhost:9090  |
-| Grafana    | http://localhost:3000  |
+| Service | URL | Credentials |
+|---|---|---|
+| Application | http://localhost:5000 | None |
+| Prometheus | http://localhost:9090 | None |
+| Grafana | http://localhost:3000 | admin / admin |
+| Health check | http://localhost:5000/health | None |
+| Metrics | http://localhost:5000/metrics | None |
+
+---
+
+## Verifying Database Persistence
+
+The SQLite database is stored in the Docker named volume `ems_db_data`, mounted at `/app/data/employees.db` inside the container.
+
+```bash
+# Add an employee through the web UI, then restart the container:
+docker-compose restart app
+
+# The employee should still be visible at http://localhost:5000
+# Verify directly:
+docker-compose exec app python -c \
+  "from app import get_db, app
+with app.app_context():
+    db = get_db()
+    count = db.execute('SELECT COUNT(*) FROM employees').fetchone()[0]
+    print(f'Employees in DB: {count}')"
+```
 
 ---
 
 ## Git and GitHub
 
 ```bash
-# Initialise a new repository
+# Initialise a repository (only needed once)
 git init
-
-# Stage all files
 git add .
+git commit -m "Initial commit – Employee Management System with DevOps pipeline"
 
-# Create the initial commit
-git commit -m "Initial commit – Employee Management System"
-
-# Add your GitHub remote (replace YOUR_USERNAME and REPO_NAME)
-git remote add origin https://github.com/YOUR_USERNAME/REPO_NAME.git
+# Connect to your GitHub repository (replace with your details)
+git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
 
 # Push to GitHub
 git push -u origin main
+
+# After making changes
+git add .
+git commit -m "Describe your change here"
+git push
 ```
 
 ---
 
-## Jenkins CI/CD Pipeline
+## Jenkins CI/CD Pipeline Setup
 
 ### Required Jenkins Plugins
+Install these at **Manage Jenkins → Plugins → Available**:
 - Pipeline
 - Git Plugin
-- Docker Pipeline Plugin
-- Credentials Binding Plugin
-- JUnit Plugin (for test reports)
+- Docker Pipeline
+- Credentials Binding
+- JUnit
+- Workspace Cleanup
 
-### Setup Steps
+### Configure Docker Hub Credentials
+1. **Manage Jenkins → Credentials → (global) → Add Credentials**
+2. Kind: **Username with password**
+3. Username: your Docker Hub username
+4. Password: your Docker Hub password or access token
+5. ID: `DOCKERHUB_CREDENTIALS` ← exact spelling required
 
-1. Install Jenkins (https://www.jenkins.io/download/).
-2. Install the plugins listed above.
-3. Add Docker Hub credentials:
-   - Jenkins → Manage Jenkins → Credentials → (global) → Add Credentials
-   - Kind: **Username with password**
-   - ID: `DOCKERHUB_CREDENTIALS`
-4. Create a new Pipeline job:
-   - New Item → Pipeline
-   - Pipeline Definition: **Pipeline script from SCM**
-   - SCM: Git → your repository URL
-   - Script Path: `Jenkinsfile`
-5. Set the `DOCKERHUB_USERNAME` environment variable in the Jenkinsfile or as a Jenkins environment variable.
-6. Click **Build Now**.
+### Configure Your Docker Hub Username
+**Manage Jenkins → System → Global Properties → Environment Variables**
+- Name: `DOCKERHUB_USERNAME`
+- Value: your Docker Hub username
 
-### Pipeline Stages
+### Create the Pipeline Job
+1. **New Item → Pipeline**
+2. Pipeline Definition: **Pipeline script from SCM**
+3. SCM: **Git**
+4. Repository URL: your GitHub repository URL
+5. Script Path: `Jenkinsfile`
+6. Click **Save → Build Now**
 
-```
-Checkout → Install Dependencies → Build → Tests → Docker Build → Docker Push → Deploy
-```
+### What Each Stage Does
+| Stage | What Happens | Stops on Failure? |
+|---|---|---|
+| Checkout | Pulls code from GitHub | Yes |
+| Install Dependencies | `pip install -r requirements.txt` | Yes |
+| Build | Python syntax check | Yes |
+| Automated Tests | Runs 13 Pytest tests, publishes JUnit results | **Yes** |
+| Docker Build | `docker build` the image | Yes |
+| Docker Push | Push to Docker Hub (skipped if credentials absent) | Yes |
+| Deploy | `docker-compose up -d` | Yes |
 
 ---
 
 ## Docker Hub
 
 ```bash
-# Login to Docker Hub
+# Login
 docker login
 
 # Build with your username
-docker build -t YOUR_DOCKERHUB_USERNAME/employee-management-system:latest .
+docker build -t YOUR_USERNAME/employee-management-system:latest .
 
-# Push the image
-docker push YOUR_DOCKERHUB_USERNAME/employee-management-system:latest
+# Push
+docker push YOUR_USERNAME/employee-management-system:latest
 
-# Pull from another machine
-docker pull YOUR_DOCKERHUB_USERNAME/employee-management-system:latest
+# Pull on another machine
+docker pull YOUR_USERNAME/employee-management-system:latest
 
 # Run the pulled image
-docker run -d -p 5000:5000 YOUR_DOCKERHUB_USERNAME/employee-management-system:latest
+docker run -d -p 5000:5000 -v ems_db:/app/data \
+  YOUR_USERNAME/employee-management-system:latest
 ```
 
 ---
 
-## Prometheus Monitoring
+## Prometheus
 
-1. Start services: `docker-compose up -d`
-2. Open Prometheus: **http://localhost:9090**
-3. Go to **Status → Targets** to verify the `employee_management_system` target is **UP**.
-4. Try these queries in the Expression browser:
-   - `up{job="employee_management_system"}` – Is the app up?
-   - `sum(flask_http_request_total)` – Total requests
-   - `rate(flask_http_request_total[5m])` – Request rate
+After `docker-compose up -d`:
+
+1. Open **http://localhost:9090/targets**
+2. Both targets should be **UP**:
+   - `employee_management_system` → `http://app:5000/metrics`
+   - `prometheus` → `http://localhost:9090/metrics`
+
+**Useful queries** (paste into the Expression box at http://localhost:9090/graph):
+
+```promql
+# Is the app running? (1 = yes, 0 = down)
+up{job="employee_management_system"}
+
+# Total HTTP requests served
+sum(flask_http_request_total{job="employee_management_system"})
+
+# Request rate over the last 5 minutes
+sum(rate(flask_http_request_total{job="employee_management_system"}[5m]))
+
+# 95th-percentile response time
+histogram_quantile(0.95,
+  sum(rate(flask_http_request_duration_seconds_bucket{job="employee_management_system"}[5m])) by (le))
+```
 
 ---
 
 ## Grafana Dashboard
 
-1. Open Grafana: **http://localhost:3000**
-2. Login: `admin` / `admin` (change after first login)
-3. The **Prometheus** data source is provisioned automatically.
-4. Go to **Dashboards → EMS → Employee Management System** to view the pre-built dashboard.
+After `docker-compose up -d`:
 
-### Dashboard Panels
-- App Status (UP/DOWN)
-- Total HTTP Requests
-- Request Rate (5m)
-- HTTP Error Rate (5xx)
-- p95 Response Time
-- HTTP Request Rate by Status (time series)
-- Response Duration p50/p95/p99 (time series)
+1. Open **http://localhost:3000** → login `admin` / `admin`
+2. The **Prometheus** data source is provisioned automatically
+3. Go to **Dashboards → EMS → Employee Management System**
 
-### System Metrics (CPU, Memory, Disk, Network)
-These require the **Node Exporter** (not included in the default Compose stack to keep it simple).
-Add it to `docker-compose.yml` and scrape it with Prometheus to monitor host resources.
+If the dashboard shows "No data", generate traffic by visiting the app, then wait 30 seconds.
+
+**To import the dashboard manually:**
+1. Click **+** → **Import dashboard**
+2. Upload `monitoring/grafana/dashboards/ems-dashboard.json`
+3. Select the **Prometheus** data source
+4. Click **Import**
 
 ---
 
@@ -257,29 +318,50 @@ Add it to `docker-compose.yml` and scrape it with Prometheus to monitor host res
 
 Three alert rules are defined in `monitoring/alert-rules.yml`:
 
-| Alert                      | Condition                          | Severity |
-|----------------------------|------------------------------------|----------|
-| `EmployeeManagementSystemDown` | App unreachable for >1 minute  | critical |
-| `HighHttpErrorRate`        | >10% 5xx errors over 5 minutes     | warning  |
-| `SlowResponseTime`         | p95 latency >2 seconds             | warning  |
+| Alert | Condition | Severity |
+|---|---|---|
+| `EmployeeManagementSystemDown` | App unreachable for >1 minute | critical |
+| `HighHttpErrorRate` | >10% 5xx errors (with traffic) | warning |
+| `SlowResponseTime` | p95 latency >2s (with traffic) | warning |
 
-To verify an alert:
-1. Stop the app container: `docker-compose stop app`
-2. Wait 1–2 minutes.
-3. Open Prometheus → **Alerts** to see the `EmployeeManagementSystemDown` alert fire.
-4. Restart the app: `docker-compose start app`
+**To test the availability alert:**
+
+```bash
+# Stop the app container
+docker-compose stop app
+
+# Wait 1–2 minutes, then open:
+# http://localhost:9090/alerts
+# "EmployeeManagementSystemDown" will show as FIRING
+
+# Restart the app
+docker-compose start app
+```
 
 ---
 
-## Troubleshooting
+## System Metrics (CPU / Memory / Disk / Network)
 
-| Problem | Solution |
-|---------|----------|
-| Port 5000 already in use | Change the host port in `docker-compose.yml`: `"5001:5000"` |
-| Database not found | Run `python -c "from app import init_db; init_db()"` |
-| Prometheus target DOWN | Ensure the app is running; check Docker network with `docker network ls` |
-| Grafana can't reach Prometheus | Both must be on the same Docker network (`monitoring`) |
-| Permission denied on `/app/data` | The Docker volume may be owned by root; rebuild with `docker-compose up -d --build` |
+These require the **Prometheus Node Exporter**. See [`docs/node-exporter.md`](docs/node-exporter.md) for full instructions. Import Grafana dashboard **ID 1860** for a pre-built host metrics dashboard.
+
+---
+
+## Environment Variables
+
+Create a `.env` file (see `.env.example`):
+
+```bash
+cp .env.example .env
+# Edit .env with a real SECRET_KEY and GRAFANA_PASSWORD
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `SECRET_KEY` | dev-secret-key-... | Flask session key — change in production |
+| `DATABASE_PATH` | /app/data/employees.db | SQLite file path inside container |
+| `FLASK_DEBUG` | false | Never enable in production |
+| `GRAFANA_USER` | admin | Grafana login username |
+| `GRAFANA_PASSWORD` | admin | Grafana login password |
 
 ---
 
@@ -287,21 +369,22 @@ To verify an alert:
 
 ```
 employee-management-system/
-├── app.py                   # Main Flask application
-├── requirements.txt         # Python dependencies
-├── test_app.py              # Automated tests (Pytest)
-├── Dockerfile               # Container image definition
-├── docker-compose.yml       # Multi-service stack
-├── Jenkinsfile              # CI/CD pipeline
-├── entrypoint.sh            # Container startup script
+├── app.py                        Flask application + routes + DB helpers
+├── requirements.txt              Python dependencies
+├── test_app.py                   13 automated Pytest tests
+├── Dockerfile                    Container image definition
+├── docker-compose.yml            App + Prometheus + Grafana stack
+├── Jenkinsfile                   CI/CD pipeline (7 stages)
+├── entrypoint.sh                 Container startup helper
+├── .env.example                  Template for local environment variables
 ├── .dockerignore
 ├── .gitignore
 ├── README.md
 │
 ├── templates/
-│   ├── base.html
-│   ├── index.html           # Dashboard
-│   ├── employees.html       # Employee list
+│   ├── base.html                 Sidebar + navbar layout
+│   ├── index.html                Dashboard
+│   ├── employees.html            Employee list + search
 │   ├── add_employee.html
 │   ├── edit_employee.html
 │   ├── employee_details.html
@@ -313,17 +396,33 @@ employee-management-system/
 │   └── js/main.js
 │
 ├── monitoring/
-│   ├── prometheus.yml
-│   ├── alert-rules.yml
+│   ├── prometheus.yml            Scrape config (app:5000/metrics)
+│   ├── alert-rules.yml           3 alert rules (down, errors, latency)
 │   └── grafana/
 │       ├── provisioning/
-│       │   ├── datasources/prometheus.yml
-│       │   └── dashboards/dashboard.yml
-│       └── dashboards/ems-dashboard.json
+│       │   ├── datasources/prometheus.yml   Auto-provision Prometheus DS
+│       │   └── dashboards/dashboard.yml     Dashboard file provider
+│       └── dashboards/
+│           └── ems-dashboard.json           7-panel dashboard
 │
 └── docs/
-    ├── architecture.md
-    ├── setup-guide.md
-    ├── troubleshooting.md
-    └── project-report.md
+    ├── architecture.md           System and pipeline diagrams
+    ├── setup-guide.md            Detailed setup instructions
+    ├── troubleshooting.md        Common problems and solutions
+    ├── node-exporter.md          Adding system metrics (CPU/RAM/disk)
+    └── project-report.md         Full mini-project report template
 ```
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| Port 5000 already in use | Change `"5000:5000"` to `"5001:5000"` in docker-compose.yml |
+| `No such table: employees` | Run `python -c "from app import init_db; init_db()"` |
+| Prometheus target DOWN | Check `docker-compose ps` — is the app container running? |
+| Grafana "No data" | Visit the app to generate traffic, wait 30s, refresh |
+| Docker permission denied | On Linux: `sudo usermod -aG docker $USER` then log out and back in |
+| `ERR_CONNECTION_REFUSED` | The app is not running — start it with `python app.py` or `docker-compose up -d` |
+| Jenkins "DOCKERHUB_CREDENTIALS not found" | Add the credential in Jenkins with ID exactly `DOCKERHUB_CREDENTIALS` |
