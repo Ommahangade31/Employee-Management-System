@@ -39,8 +39,8 @@ pipeline {
             steps {
                 echo '>>> Stage 2: Installing Python dependencies...'
                 bat 'python -m venv venv'
-                bat 'venv\\Scripts\\pip install --upgrade pip --quiet'
-                bat 'venv\\Scripts\\pip install -r requirements.txt --quiet'
+                bat 'venv\\Scripts\\python -m pip install --upgrade pip --quiet'
+                bat 'venv\\Scripts\\python -m pip install -r requirements.txt --quiet'
                 echo '>>> Dependencies installed.'
             }
         }
