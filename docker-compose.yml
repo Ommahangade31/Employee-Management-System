@@ -16,8 +16,6 @@
 #   docker-compose up -d --build  # rebuild app image and restart
 # =============================================================
 
-version: "3.9"
-
 services:
 
   # ---- Flask Application ----------------------------------------

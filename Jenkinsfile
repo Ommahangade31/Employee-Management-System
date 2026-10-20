@@ -146,7 +146,9 @@ pipeline {
                     def dockerAvailable = bat(script: 'docker --version', returnStatus: true) == 0
                     if (dockerAvailable) {
                         echo ">>> Stage 7: Deploying with Docker Compose..."
-                        bat 'docker-compose down --remove-orphans || exit 0'
+                        bat 'docker stop ems_app ems_prometheus ems_grafana 2>nul & exit 0'
+                        bat 'docker rm ems_app ems_prometheus ems_grafana 2>nul & exit 0'
+                        bat 'docker-compose down --remove-orphans 2>nul & exit 0'
                         bat 'docker-compose up -d --build'
                         bat 'docker-compose ps'
                         echo ">>> Deployed: http://localhost:5000"
