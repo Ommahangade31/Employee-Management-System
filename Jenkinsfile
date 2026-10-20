@@ -2,33 +2,6 @@
 // Jenkinsfile – Employee Management System CI/CD Pipeline
 // Declarative Pipeline – Windows Agent
 // =============================================================
-//
-// REQUIRED SETUP (do this in Jenkins before running the pipeline):
-//
-//   1. Plugins to install (Manage Jenkins → Plugins → Available):
-//        - Pipeline
-//        - Git Plugin
-//        - Docker Pipeline
-//        - Credentials Binding
-//        - JUnit
-//        - Workspace Cleanup
-//
-//   2. Credentials (Manage Jenkins → Credentials → global → Add):
-//        Kind        : Username with password
-//        Username    : <your Docker Hub username>
-//        Password    : <your Docker Hub password or access token>
-//        ID          : DOCKERHUB_CREDENTIALS   ← exact value required
-//
-//   3. Environment variable (Manage Jenkins → System → Global Properties):
-//        Name  : DOCKERHUB_USERNAME
-//        Value : <your Docker Hub username>
-//
-// PIPELINE STAGES:
-//   Checkout → Install Deps → Build → Tests → Docker Build → Docker Push → Deploy
-//
-// Tests MUST pass before Docker stages run.
-// Docker Push is skipped automatically when credentials are not configured.
-// =============================================================
 
 pipeline {
 
@@ -38,8 +11,6 @@ pipeline {
         DOCKERHUB_USERNAME = "${env.DOCKERHUB_USERNAME ?: 'your-dockerhub-username'}"
         IMAGE_NAME         = "employee-management-system"
         IMAGE_TAG          = "${env.BUILD_NUMBER ?: 'latest'}"
-        FULL_IMAGE         = "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}"
-        LATEST_IMAGE       = "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
     }
 
     options {
@@ -55,9 +26,9 @@ pipeline {
         // ------------------------------------------------------------------
         stage('Checkout') {
             steps {
-                echo ">>> Checking out source code from GitHub..."
+                echo ">>> Stage 1: Checkout"
                 checkout scm
-                echo ">>> Build Number: ${env.BUILD_NUMBER}"
+                echo ">>> Source code checked out. Build: ${env.BUILD_NUMBER}"
             }
         }
 
@@ -66,14 +37,11 @@ pipeline {
         // ------------------------------------------------------------------
         stage('Install Dependencies') {
             steps {
-                echo '>>> Installing Python dependencies...'
-                bat '''
-                    python -m venv venv
-                    call venv\\Scripts\\activate.bat
-                    python -m pip install --upgrade pip --quiet
-                    pip install -r requirements.txt --quiet
-                    echo Dependencies installed successfully.
-                '''
+                echo '>>> Stage 2: Installing Python dependencies...'
+                bat 'python -m venv venv'
+                bat 'venv\\Scripts\\pip install --upgrade pip --quiet'
+                bat 'venv\\Scripts\\pip install -r requirements.txt --quiet'
+                echo '>>> Dependencies installed.'
             }
         }
 
@@ -82,86 +50,89 @@ pipeline {
         // ------------------------------------------------------------------
         stage('Build') {
             steps {
-                echo '>>> Checking Python syntax...'
-                bat '''
-                    call venv\\Scripts\\activate.bat
-                    python -m py_compile app.py
-                    echo Syntax check passed.
-                '''
+                echo '>>> Stage 3: Python syntax check...'
+                bat 'venv\\Scripts\\python -m py_compile app.py'
+                echo '>>> Syntax check passed.'
             }
         }
 
         // ------------------------------------------------------------------
-        // Stage 4: Automated Tests  ← pipeline stops here if any test fails
+        // Stage 4: Automated Tests
         // ------------------------------------------------------------------
         stage('Automated Tests') {
             steps {
-                echo '>>> Running 13 automated tests with Pytest...'
-                bat '''
-                    call venv\\Scripts\\activate.bat
-                    pytest test_app.py -v --tb=short --junitxml=test-results.xml
-                '''
+                echo '>>> Stage 4: Running 13 automated tests...'
+                bat 'venv\\Scripts\\pytest test_app.py -v --tb=short --junitxml=test-results.xml'
             }
             post {
                 always {
                     junit allowEmptyResults: true, testResults: 'test-results.xml'
                 }
                 success {
-                    echo '>>> All 13 tests PASSED – proceeding to Docker stages.'
+                    echo '>>> All 13 tests PASSED.'
                 }
                 failure {
-                    echo '>>> Tests FAILED – pipeline stopped. Fix failing tests first.'
+                    echo '>>> Tests FAILED – pipeline stopped.'
                 }
             }
         }
 
         // ------------------------------------------------------------------
-        // Stage 5: Docker Build
+        // Stage 5: Docker Build (requires Docker Desktop)
         // ------------------------------------------------------------------
         stage('Docker Build') {
             steps {
-                echo ">>> Building Docker image: ${FULL_IMAGE}"
-                bat """
-                    docker build -t ${FULL_IMAGE} .
-                    docker tag ${FULL_IMAGE} ${LATEST_IMAGE}
-                    echo Docker image built successfully.
-                """
+                script {
+                    def dockerAvailable = bat(
+                        script: 'docker --version',
+                        returnStatus: true
+                    ) == 0
+                    if (dockerAvailable) {
+                        echo ">>> Stage 5: Building Docker image..."
+                        bat "docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG} ."
+                        bat "docker tag ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG} ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
+                        echo ">>> Docker image built."
+                    } else {
+                        echo ">>> Stage 5: Docker not available – skipping Docker Build."
+                        echo ">>> Install Docker Desktop to enable this stage."
+                    }
+                }
             }
         }
 
         // ------------------------------------------------------------------
-        // Stage 6: Docker Push  ← skipped when credentials not configured
+        // Stage 6: Docker Push
         // ------------------------------------------------------------------
         stage('Docker Push') {
-            when {
-                expression {
+            steps {
+                script {
+                    def dockerAvailable = bat(script: 'docker --version', returnStatus: true) == 0
+                    def credAvailable = false
                     try {
                         withCredentials([usernamePassword(
                             credentialsId: 'DOCKERHUB_CREDENTIALS',
-                            usernameVariable: 'U',
-                            passwordVariable: 'P')]) { return true }
-                    } catch (e) {
-                        echo "DOCKERHUB_CREDENTIALS not configured – skipping push."
-                        return false
+                            usernameVariable: 'U', passwordVariable: 'P')]) {
+                            credAvailable = true
+                        }
+                    } catch (e) { credAvailable = false }
+
+                    if (dockerAvailable && credAvailable) {
+                        echo ">>> Stage 6: Pushing to Docker Hub..."
+                        withCredentials([usernamePassword(
+                            credentialsId: 'DOCKERHUB_CREDENTIALS',
+                            usernameVariable: 'DOCKER_USER',
+                            passwordVariable: 'DOCKER_PASS')]) {
+                            bat "echo %DOCKER_PASS%| docker login -u %DOCKER_USER% --password-stdin"
+                            bat "docker push ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}"
+                            bat "docker push ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
+                            bat "docker logout"
+                        }
+                        echo ">>> Image pushed to Docker Hub."
+                    } else {
+                        echo ">>> Stage 6: Skipping Docker Push."
+                        echo ">>>   Docker available : ${dockerAvailable}"
+                        echo ">>>   Credentials set  : ${credAvailable}"
                     }
-                }
-            }
-            steps {
-                echo ">>> Pushing image to Docker Hub..."
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'DOCKERHUB_CREDENTIALS',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]) {
-                    bat """
-                        echo %DOCKER_PASS%| docker login -u %DOCKER_USER% --password-stdin
-                        docker push ${FULL_IMAGE}
-                        docker push ${LATEST_IMAGE}
-                        docker logout
-                        echo Image pushed successfully.
-                    """
                 }
             }
         }
@@ -171,16 +142,19 @@ pipeline {
         // ------------------------------------------------------------------
         stage('Deploy') {
             steps {
-                echo '>>> Deploying with Docker Compose...'
-                bat '''
-                    docker-compose down --remove-orphans || exit 0
-                    docker-compose up -d --build
-                    docker-compose ps
-                '''
-                echo ">>> Deployment complete."
-                echo ">>>   App       : http://localhost:5000"
-                echo ">>>   Prometheus: http://localhost:9090"
-                echo ">>>   Grafana   : http://localhost:3000"
+                script {
+                    def dockerAvailable = bat(script: 'docker --version', returnStatus: true) == 0
+                    if (dockerAvailable) {
+                        echo ">>> Stage 7: Deploying with Docker Compose..."
+                        bat 'docker-compose down --remove-orphans || exit 0'
+                        bat 'docker-compose up -d --build'
+                        bat 'docker-compose ps'
+                        echo ">>> Deployed: http://localhost:5000"
+                    } else {
+                        echo ">>> Stage 7: Docker not available – skipping Deploy."
+                        echo ">>> Application is already running via: python app.py"
+                    }
+                }
             }
         }
 
@@ -194,10 +168,10 @@ pipeline {
             echo '=== PIPELINE SUCCEEDED ==='
         }
         failure {
-            echo '=== PIPELINE FAILED – check the stage that turned red ==='
+            echo '=== PIPELINE FAILED – check the red stage above ==='
         }
         always {
-            bat 'docker image prune -f || exit 0'
+            echo '>>> Pipeline finished. Cleaning workspace...'
             cleanWs()
         }
     }
