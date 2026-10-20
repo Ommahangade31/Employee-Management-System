@@ -8,7 +8,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_USERNAME = "${env.DOCKERHUB_USERNAME ?: 'your-dockerhub-username'}"
+        DOCKERHUB_USERNAME = "${env.DOCKERHUB_USERNAME ?: 'ommahangade31'}"
         IMAGE_NAME         = "employee-management-system"
         IMAGE_TAG          = "${env.BUILD_NUMBER ?: 'latest'}"
     }
