@@ -1,0 +1,39 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Local database files
+data/
+*.db
+*.sqlite3
+
+# Environment variable files
+.env
+.env.*
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+test-results.xml
+
+# IDE / editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.orig
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Add Employee – EMS{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+  <h2 class="fw-bold mb-1"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Add Employee</h2>
+  <p class="text-muted mb-0">Fill in the details to create a new employee record.</p>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom fw-semibold">
+        <i class="bi bi-person-badge me-1 text-primary"></i> Employee Information
+      </div>
+      <div class="card-body p-4">
+
+        {% if errors %}
+        <div class="alert alert-danger">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <strong>Please correct the following errors:</strong>
+          <ul class="mb-0 mt-2">
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('add_employee') }}" novalidate>
+          <div class="row g-3">
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Employee ID <span class="text-danger">*</span></label>
+              <input type="text" name="employee_id" class="form-control"
+                     placeholder="e.g. EMP006"
+                     value="{{ form.get('employee_id', '') }}" required>
+              <div class="form-text">Must be unique across all employees.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+              <input type="text" name="full_name" class="form-control"
+                     placeholder="First and Last Name"
+                     value="{{ form.get('full_name', '') }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Email Address <span class="text-danger">*</span></label>
+              <input type="email" name="email" class="form-control"
+                     placeholder="name@example.com"
+                     value="{{ form.get('email', '') }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Phone Number <span class="text-danger">*</span></label>
+              <input type="tel" name="phone" class="form-control"
+                     placeholder="555-0100"
+                     value="{{ form.get('phone', '') }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Department <span class="text-danger">*</span></label>
+              <select name="department" class="form-select" required>
+                <option value="">-- Select Department --</option>
+                {% for dept in departments %}
+                <option value="{{ dept }}"
+                  {% if form.get('department') == dept %}selected{% endif %}>
+                  {{ dept }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Job Designation <span class="text-danger">*</span></label>
+              <input type="text" name="designation" class="form-control"
+                     placeholder="e.g. Software Engineer"
+                     value="{{ form.get('designation', '') }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Joining Date <span class="text-danger">*</span></label>
+              <input type="date" name="joining_date" class="form-control"
+                     value="{{ form.get('joining_date', '') }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Salary (₹) <span class="text-danger">*</span></label>
+              <input type="number" name="salary" class="form-control"
+                     placeholder="e.g. 60000"
+                     min="0" step="0.01"
+                     value="{{ form.get('salary', '') }}" required>
+            </div>
+
+          </div><!-- /.row -->
+
+          <hr class="my-4">
+
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{{ url_for('employees') }}" class="btn btn-outline-secondary">
+              <i class="bi bi-x-lg me-1"></i> Cancel
+            </a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-person-plus-fill me-1"></i> Add Employee
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,78 @@
+# ============================================================
+# Prometheus Alert Rules – Employee Management System
+# ============================================================
+# Evaluated every 15 seconds (set in prometheus.yml).
+# View active alerts at: http://localhost:9090/alerts
+# ============================================================
+
+groups:
+
+  # ------------------------------------------------------------------
+  # Group 1: Application Availability  (most important alert)
+  # ------------------------------------------------------------------
+  - name: application_availability
+    rules:
+
+      - alert: EmployeeManagementSystemDown
+        # Fires when Prometheus cannot reach the /metrics endpoint
+        expr: up{job="employee_management_system"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Employee Management System is DOWN"
+          description: >
+            The Employee Management System ({{ $labels.instance }}) has been
+            unreachable for more than 1 minute.
+            Check containers: docker-compose ps
+            Restart app:      docker-compose start app
+
+  # ------------------------------------------------------------------
+  # Group 2: High HTTP Error Rate
+  # ------------------------------------------------------------------
+  - name: http_errors
+    rules:
+
+      - alert: HighHttpErrorRate
+        # Guard against division-by-zero when there is no traffic:
+        # only fire when total request rate is > 0 AND error rate > 10 %.
+        expr: >
+          (
+            sum(rate(flask_http_request_total{job="employee_management_system", status=~"5.."}[5m]))
+            /
+            sum(rate(flask_http_request_total{job="employee_management_system"}[5m]))
+          ) > 0.10
+          and
+          sum(rate(flask_http_request_total{job="employee_management_system"}[5m])) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx error rate on Employee Management System"
+          description: >
+            More than 10 % of requests are returning 5xx errors.
+            Check application logs: docker-compose logs app
+
+  # ------------------------------------------------------------------
+  # Group 3: Slow Response Times
+  # ------------------------------------------------------------------
+  - name: response_times
+    rules:
+
+      - alert: SlowResponseTime
+        # Only fire when there is active traffic (avoids false positives on idle)
+        expr: >
+          histogram_quantile(
+            0.95,
+            rate(flask_http_request_duration_seconds_bucket{job="employee_management_system"}[5m])
+          ) > 2
+          and
+          sum(rate(flask_http_request_total{job="employee_management_system"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow response times on Employee Management System"
+          description: >
+            The 95th-percentile response time exceeds 2 seconds.
+            Current value: {{ $value | humanizeDuration }}

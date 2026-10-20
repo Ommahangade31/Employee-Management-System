@@ -1,0 +1,38 @@
+# ============================================================
+# Prometheus Configuration
+# ============================================================
+#
+# Prometheus scrapes metrics from the Flask application every 15 seconds.
+# The Flask app is referenced by the Docker Compose service name "app",
+# NOT by "localhost" (which would point to the Prometheus container itself).
+#
+# Access Prometheus at: http://localhost:9090
+# ============================================================
+
+global:
+  scrape_interval:     15s   # How often to collect metrics
+  evaluation_interval: 15s   # How often to evaluate alert rules
+  scrape_timeout:      10s
+
+# Load alert rules from this file
+rule_files:
+  - "alert-rules.yml"
+
+# Define what to scrape
+scrape_configs:
+
+  # Scrape Prometheus's own metrics (useful for debugging)
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Scrape the Flask Employee Management System application
+  - job_name: "employee_management_system"
+    metrics_path: "/metrics"
+    static_configs:
+      # "app" is the Docker Compose service name – this is how Prometheus
+      # finds the Flask container on the shared Docker network.
+      - targets: ["app:5000"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance

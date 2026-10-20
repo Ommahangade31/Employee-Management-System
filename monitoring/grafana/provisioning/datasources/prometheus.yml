@@ -1,0 +1,20 @@
+# Grafana Datasource Provisioning
+# Automatically adds Prometheus as the default data source on container start.
+# The uid "prometheus-ems" matches the datasource reference used in the
+# dashboard JSON file (ems-dashboard.json).
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus-ems
+    access: proxy
+    # "prometheus" = Docker Compose service name on the ems_network
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    version: 1
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST
