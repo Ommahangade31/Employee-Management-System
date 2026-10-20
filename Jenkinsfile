@@ -1,35 +1,33 @@
 // =============================================================
 // Jenkinsfile – Employee Management System CI/CD Pipeline
-// Declarative Pipeline
+// Declarative Pipeline – Windows Agent
 // =============================================================
 //
 // REQUIRED SETUP (do this in Jenkins before running the pipeline):
 //
-//   1. Plugins to install (Manage Jenkins → Plugins):
+//   1. Plugins to install (Manage Jenkins → Plugins → Available):
 //        - Pipeline
 //        - Git Plugin
 //        - Docker Pipeline
 //        - Credentials Binding
-//        - JUnit (for test result graphs)
-//        - Workspace Cleanup (for cleanWs())
+//        - JUnit
+//        - Workspace Cleanup
 //
-//   2. Credentials to add (Manage Jenkins → Credentials → global → Add):
-//        Kind            : Username with password
-//        Username        : <your Docker Hub username>
-//        Password        : <your Docker Hub password or access token>
-//        ID              : DOCKERHUB_CREDENTIALS      ← exact value required
-//        Description     : Docker Hub credentials
+//   2. Credentials (Manage Jenkins → Credentials → global → Add):
+//        Kind        : Username with password
+//        Username    : <your Docker Hub username>
+//        Password    : <your Docker Hub password or access token>
+//        ID          : DOCKERHUB_CREDENTIALS   ← exact value required
 //
-//   3. Jenkins environment variable (optional – or edit the default below):
-//        Manage Jenkins → System → Global Properties → Environment Variables
+//   3. Environment variable (Manage Jenkins → System → Global Properties):
 //        Name  : DOCKERHUB_USERNAME
 //        Value : <your Docker Hub username>
 //
 // PIPELINE STAGES:
-//   Checkout → Install Deps → Build (syntax) → Tests → Docker Build → Docker Push → Deploy
+//   Checkout → Install Deps → Build → Tests → Docker Build → Docker Push → Deploy
 //
-// The pipeline STOPS if Tests fail. Docker Push only runs when the
-// DOCKERHUB_CREDENTIALS credential exists.
+// Tests MUST pass before Docker stages run.
+// Docker Push is skipped automatically when credentials are not configured.
 // =============================================================
 
 pipeline {
@@ -37,7 +35,6 @@ pipeline {
     agent any
 
     environment {
-        // Set DOCKERHUB_USERNAME as a Jenkins env var, or replace the default here
         DOCKERHUB_USERNAME = "${env.DOCKERHUB_USERNAME ?: 'your-dockerhub-username'}"
         IMAGE_NAME         = "employee-management-system"
         IMAGE_TAG          = "${env.BUILD_NUMBER ?: 'latest'}"
@@ -58,10 +55,9 @@ pipeline {
         // ------------------------------------------------------------------
         stage('Checkout') {
             steps {
-                echo ">>> Checking out source code..."
+                echo ">>> Checking out source code from GitHub..."
                 checkout scm
-                sh 'echo "Commit: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"'
-                echo ">>> Build : ${env.BUILD_NUMBER}"
+                echo ">>> Build Number: ${env.BUILD_NUMBER}"
             }
         }
 
@@ -70,13 +66,13 @@ pipeline {
         // ------------------------------------------------------------------
         stage('Install Dependencies') {
             steps {
-                echo '>>> Creating virtual environment and installing dependencies...'
-                sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install --upgrade pip --quiet
+                echo '>>> Installing Python dependencies...'
+                bat '''
+                    python -m venv venv
+                    call venv\\Scripts\\activate.bat
+                    python -m pip install --upgrade pip --quiet
                     pip install -r requirements.txt --quiet
-                    echo "Dependencies installed."
+                    echo Dependencies installed successfully.
                 '''
             }
         }
@@ -87,35 +83,34 @@ pipeline {
         stage('Build') {
             steps {
                 echo '>>> Checking Python syntax...'
-                sh '''
-                    . venv/bin/activate
-                    python3 -m py_compile app.py
-                    echo "Syntax OK."
+                bat '''
+                    call venv\\Scripts\\activate.bat
+                    python -m py_compile app.py
+                    echo Syntax check passed.
                 '''
             }
         }
 
         // ------------------------------------------------------------------
-        // Stage 4: Automated Tests  ← pipeline stops here if tests fail
+        // Stage 4: Automated Tests  ← pipeline stops here if any test fails
         // ------------------------------------------------------------------
         stage('Automated Tests') {
             steps {
                 echo '>>> Running 13 automated tests with Pytest...'
-                sh '''
-                    . venv/bin/activate
+                bat '''
+                    call venv\\Scripts\\activate.bat
                     pytest test_app.py -v --tb=short --junitxml=test-results.xml
                 '''
             }
             post {
                 always {
-                    // Publish JUnit test results (requires JUnit plugin)
                     junit allowEmptyResults: true, testResults: 'test-results.xml'
                 }
                 success {
-                    echo '>>> All tests PASSED – continuing to Docker stages.'
+                    echo '>>> All 13 tests PASSED – proceeding to Docker stages.'
                 }
                 failure {
-                    echo '>>> Tests FAILED – pipeline stopped. Fix the failing tests before retrying.'
+                    echo '>>> Tests FAILED – pipeline stopped. Fix failing tests first.'
                 }
             }
         }
@@ -126,25 +121,25 @@ pipeline {
         stage('Docker Build') {
             steps {
                 echo ">>> Building Docker image: ${FULL_IMAGE}"
-                sh """
+                bat """
                     docker build -t ${FULL_IMAGE} .
                     docker tag ${FULL_IMAGE} ${LATEST_IMAGE}
-                    echo "Image built: ${FULL_IMAGE}"
+                    echo Docker image built successfully.
                 """
             }
         }
 
         // ------------------------------------------------------------------
-        // Stage 6: Docker Push  ← only runs when credential ID exists
+        // Stage 6: Docker Push  ← skipped when credentials not configured
         // ------------------------------------------------------------------
         stage('Docker Push') {
             when {
-                // Only push when the credential has been configured in Jenkins
                 expression {
                     try {
                         withCredentials([usernamePassword(
                             credentialsId: 'DOCKERHUB_CREDENTIALS',
-                            usernameVariable: 'U', passwordVariable: 'P')]) { return true }
+                            usernameVariable: 'U',
+                            passwordVariable: 'P')]) { return true }
                     } catch (e) {
                         echo "DOCKERHUB_CREDENTIALS not configured – skipping push."
                         return false
@@ -160,12 +155,12 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
-                    sh """
-                        echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
+                    bat """
+                        echo %DOCKER_PASS%| docker login -u %DOCKER_USER% --password-stdin
                         docker push ${FULL_IMAGE}
                         docker push ${LATEST_IMAGE}
                         docker logout
-                        echo "Pushed: ${FULL_IMAGE}"
+                        echo Image pushed successfully.
                     """
                 }
             }
@@ -177,12 +172,12 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo '>>> Deploying with Docker Compose...'
-                sh '''
-                    docker-compose down --remove-orphans || true
+                bat '''
+                    docker-compose down --remove-orphans || exit 0
                     docker-compose up -d --build
                     docker-compose ps
                 '''
-                echo ">>> Deployed successfully."
+                echo ">>> Deployment complete."
                 echo ">>>   App       : http://localhost:5000"
                 echo ">>>   Prometheus: http://localhost:9090"
                 echo ">>>   Grafana   : http://localhost:3000"
@@ -199,12 +194,10 @@ pipeline {
             echo '=== PIPELINE SUCCEEDED ==='
         }
         failure {
-            echo '=== PIPELINE FAILED – check the failed stage above ==='
+            echo '=== PIPELINE FAILED – check the stage that turned red ==='
         }
         always {
-            // Remove dangling (untagged) Docker images to save disk space
-            sh 'docker image prune -f || true'
-            // Clean Jenkins workspace
+            bat 'docker image prune -f || exit 0'
             cleanWs()
         }
     }
